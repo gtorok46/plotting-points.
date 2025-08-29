@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plotting Points App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 0;
+      background: #f7f7f7;
+    }
+    h1 {
+      margin-top: 24px;
+    }
+    #container {
+      margin-top: 24px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 32px 32px 24px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #prompt {
+      font-size: 1.2em;
+      margin-bottom: 16px;
+    }
+    #graph {
+      background: #e9e9e9;
+      border: 2px solid #333;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      touch-action: none;
+    }
+    #controls {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    #result {
+      font-weight: bold;
+      min-height: 24px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Plotting Points</h1>
+  <div id="container">
+    <div id="prompt">Drag the point to: <span id="target-coords"></span></div>
+    <canvas id="graph" width="440" height="440"></canvas>
+    <div id="controls">
+      <button id="check-btn">Check</button>
+      <button id="new-btn">New Point</button>
+    </div>
+    <div id="result"></div>
+  </div>
+  <script>
+    // Constants
+    const size = 440;
+    const gridCount = 21; // 0 to 10 in all directions, so 21 lines
+    const gridSpacing = size / gridCount;
+    const center = size / 2;
+    const pointRadius = 10;
+    let target = { x: 0, y: 0 };
+    let point = { x: 0, y: 0 };
+    let dragging = false;
+
+    const canvas = document.getElementById('graph');
+    const ctx = canvas.getContext('2d');
+    const targetCoords = document.getElementById('target-coords');
+    const resultDiv = document.getElementById('result');
+    const checkBtn = document.getElementById('check-btn');
+    const newBtn = document.getElementById('new-btn');
+
+    function drawGrid() {
+      ctx.clearRect(0, 0, size, size);
+      ctx.save();
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = 1;
+      // Draw grid lines
+      for (let i = 0; i < gridCount; i++) {
+        let pos = i * gridSpacing;
+        // Vertical
+        ctx.beginPath();
+        ctx.moveTo(pos, 0);
+        ctx.lineTo(pos, size);
+        ctx.stroke();
+        // Horizontal
+        ctx.beginPath();
+        ctx.moveTo(0, pos);
+        ctx.lineTo(size, pos);
+        ctx.stroke();
+      }
+      // Draw axes
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      // y-axis
+      ctx.beginPath();
+      ctx.moveTo(center, 0);
+      ctx.lineTo(center, size);
+      ctx.stroke();
+      // x-axis
+      ctx.beginPath();
+      ctx.moveTo(0, center);
+      ctx.lineTo(size, center);
+      ctx.stroke();
+      // Draw labels
+      ctx.fillStyle = '#222';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = -10; i <= 10; i++) {
+        if (i === 0) continue;
+        // x labels
+        ctx.fillText(i, center + i * gridSpacing, center + 18);
+        // y labels
+        ctx.fillText(-i, center - 18, center + i * gridSpacing);
+      }
+      ctx.fillText('0', center - 18, center + 18);
+      ctx.restore();
+    }
+
+    function drawPoint(pt, color = '#1976d2') {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(center + pt.x * gridSpacing, center - pt.y * gridSpacing, pointRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.shadowColor = '#888';
+      ctx.shadowBlur = 4;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function draw() {
+      drawGrid();
+      drawPoint(point);
+    }
+
+    function snapToGrid(mx, my) {
+      // Convert mouse to grid coords
+      let gx = Math.round((mx - center) / gridSpacing);
+      let gy = Math.round((center - my) / gridSpacing);
+      gx = Math.max(-10, Math.min(10, gx));
+      gy = Math.max(-10, Math.min(10, gy));
+      return { x: gx, y: gy };
+    }
+
+    function setRandomTarget() {
+      // Exclude (0,0) for more interesting points
+      let x, y;
+      do {
+        x = Math.floor(Math.random() * 21) - 10;
+        y = Math.floor(Math.random() * 21) - 10;
+      } while (x === 0 && y === 0);
+      target = { x, y };
+      targetCoords.textContent = `(${x}, ${y})`;
+      // Reset point to (0,0)
+      point = { x: 0, y: 0 };
+      resultDiv.textContent = '';
+      draw();
+    }
+
+    // Drag logic
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const px = center + point.x * gridSpacing;
+      const py = center - point.y * gridSpacing;
+      if (Math.hypot(mx - px, my - py) < pointRadius + 4) {
+        dragging = true;
+      }
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      point = snapToGrid(mx, my);
+      draw();
+    });
+    canvas.addEventListener('mouseup', () => {
+      dragging = false;
+      draw();
+    });
+    canvas.addEventListener('mouseleave', () => {
+      dragging = false;
+      draw();
+    });
+    // Touch events for mobile
+    canvas.addEventListener('touchstart', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const mx = touch.clientX - rect.left;
+      const my = touch.clientY - rect.top;
+      const px = center + point.x * gridSpacing;
+      const py = center - point.y * gridSpacing;
+      if (Math.hypot(mx - px, my - py) < pointRadius + 8) {
+        dragging = true;
+        e.preventDefault();
+      }
+    });
+    canvas.addEventListener('touchmove', (e) => {
+      if (!dragging) return;
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const mx = touch.clientX - rect.left;
+      const my = touch.clientY - rect.top;
+      point = snapToGrid(mx, my);
+      draw();
+      e.preventDefault();
+    });
+    canvas.addEventListener('touchend', () => {
+      dragging = false;
+      draw();
+    });
+
+    checkBtn.addEventListener('click', () => {
+      if (point.x === target.x && point.y === target.y) {
+        resultDiv.textContent = '✅ Correct!';
+        resultDiv.style.color = 'green';
+      } else {
+        resultDiv.textContent = `❌ Incorrect. You placed it at (${point.x}, ${point.y})`;
+        resultDiv.style.color = 'red';
+      }
+    });
+    newBtn.addEventListener('click', setRandomTarget);
+
+    // Initial setup
+    setRandomTarget();
+  </script>
+</body>
+</html>
